@@ -37,19 +37,10 @@ data "aws_subnets" "default_subnets" {
 }
 
 # -------------------------
-# ECR Repository for Strapi
+# ECR Repository for Strapi (referenced from existing)
 # -------------------------
-resource "aws_ecr_repository" "strapi" {
-  name                 = "strapi-app"
-  image_tag_mutability = "MUTABLE"
-
-  image_scanning_configuration {
-    scan_on_push = false
-  }
-
-  tags = {
-    Name = "strapi-app-repository"
-  }
+data "aws_ecr_repository" "strapi" {
+  name = "strapi-app"
 }
 
 # -------------------------
@@ -203,6 +194,10 @@ resource "aws_instance" "strapi" {
 
   tags = {
     Name = "strapi-ubuntu-ec2"
+  }
+
+  lifecycle {
+    ignore_changes = [user_data, tags]
   }
 }
 
