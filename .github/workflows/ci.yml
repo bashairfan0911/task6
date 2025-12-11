@@ -45,9 +45,3 @@ jobs:
           context: .
           push: true
           tags: ${{ steps.meta.outputs.tags }}
-
-      - name: Image digest
-        run: echo "Image pushed with digest ${{ steps.build.outputs.digest }}"
-
-      - name: Log build completion
-        run: echo "Successfully built and pushed image tag: ${{ steps.meta.outputs.tags }}"
