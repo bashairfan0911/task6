@@ -39,12 +39,16 @@ jobs:
         run: terraform plan -no-color -out=tfplan
         env:
           TF_VAR_aws_region: ${{ env.AWS_REGION }}
+          TF_VAR_aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          TF_VAR_aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
       - name: Terraform Apply
         working-directory: ${{ env.TERRAFORM_DIR }}
         run: terraform apply -no-color -auto-approve tfplan
         env:
           TF_VAR_aws_region: ${{ env.AWS_REGION }}
+          TF_VAR_aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          TF_VAR_aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
       - name: Get Terraform Outputs
         id: terraform_output

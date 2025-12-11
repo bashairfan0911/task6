@@ -103,36 +103,6 @@ resource "aws_db_subnet_group" "strapi_db_subnet_group" {
 }
 
 # -------------------------
-# IAM Role for EC2 to Access ECR
-# -------------------------
-resource "aws_iam_role" "ec2_ecr_role" {
-  name = "strapi-ec2-ecr-role"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Action = "sts:AssumeRole"
-        Effect = "Allow"
-        Principal = {
-          Service = "ec2.amazonaws.com"
-        }
-      }
-    ]
-  })
-}
-
-resource "aws_iam_role_policy_attachment" "ecr_policy" {
-  role       = aws_iam_role.ec2_ecr_role.name
-  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
-}
-
-resource "aws_iam_instance_profile" "ec2_profile" {
-  name = "strapi-ec2-profile"
-  role = aws_iam_role.ec2_ecr_role.name
-}
-
-# -------------------------
 # RDS PostgreSQL Instance (no engine_version → AWS auto-selects)
 # -------------------------
 resource "aws_db_instance" "strapi_rds" {
@@ -170,8 +140,18 @@ locals {
 
               usermod -aG docker ubuntu
 
+              # Configure AWS credentials for ECR access
+              mkdir -p /home/ubuntu/.aws
+              cat > /home/ubuntu/.aws/credentials <<AWSCREDS
+[default]
+aws_access_key_id = ${var.aws_access_key_id}
+aws_secret_access_key = ${var.aws_secret_access_key}
+AWSCREDS
+              chmod 600 /home/ubuntu/.aws/credentials
+              chown -R ubuntu:ubuntu /home/ubuntu/.aws
+
               # Login to ECR and pull Strapi image
-              aws ecr get-login-password --region ap-south-1 | docker login --username AWS --password-stdin 301782007642.dkr.ecr.ap-south-1.amazonaws.com
+              sudo -u ubuntu aws ecr get-login-password --region ap-south-1 | docker login --username AWS --password-stdin 301782007642.dkr.ecr.ap-south-1.amazonaws.com
               docker pull ${var.docker_image}
 
               # Wait for RDS to be ready
@@ -201,7 +181,6 @@ resource "aws_instance" "strapi" {
   ami                         = data.aws_ami.ubuntu.id
   instance_type               = var.instance_type
   vpc_security_group_ids      = [aws_security_group.strapi_sg.id]
-  iam_instance_profile        = aws_iam_instance_profile.ec2_profile.name
   associate_public_ip_address = true
 
   user_data = local.user_data
