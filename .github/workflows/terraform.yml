@@ -63,13 +63,20 @@ jobs:
         id: terraform_output
         working-directory: ${{ env.TERRAFORM_DIR }}
         run: |
-          PUBLIC_IP=$(terraform output -raw public_ip)
-          STRAPI_URL=$(terraform output -raw strapi_url)
-          echo "public_ip=$PUBLIC_IP" >> $GITHUB_OUTPUT
-          echo "strapi_url=$STRAPI_URL" >> $GITHUB_OUTPUT
-          echo "Deployment Info:" >> $GITHUB_STEP_SUMMARY
-          echo "- Public IP: $PUBLIC_IP" >> $GITHUB_STEP_SUMMARY
-          echo "- Strapi URL: $STRAPI_URL" >> $GITHUB_STEP_SUMMARY
+          set +e
+          PUBLIC_IP=$(terraform output -raw public_ip 2>/dev/null | tr -d '\n')
+          STRAPI_URL=$(terraform output -raw strapi_url 2>/dev/null | tr -d '\n')
+          ECR_URL=$(terraform output -raw ecr_repository_url 2>/dev/null | tr -d '\n')
+          set -e
+          
+          echo "public_ip=${PUBLIC_IP}" >> $GITHUB_OUTPUT
+          echo "strapi_url=${STRAPI_URL}" >> $GITHUB_OUTPUT
+          echo "ecr_url=${ECR_URL}" >> $GITHUB_OUTPUT
+          
+          echo "## Terraform Outputs" >> $GITHUB_STEP_SUMMARY
+          echo "- **Public IP**: ${PUBLIC_IP}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Strapi URL**: ${STRAPI_URL}" >> $GITHUB_STEP_SUMMARY
+          echo "- **ECR Repository**: ${ECR_URL}" >> $GITHUB_STEP_SUMMARY
 
       - name: Verify EC2 Instance SSH
         run: |
