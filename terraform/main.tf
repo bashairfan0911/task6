@@ -37,6 +37,22 @@ data "aws_subnets" "default_subnets" {
 }
 
 # -------------------------
+# ECR Repository for Strapi
+# -------------------------
+resource "aws_ecr_repository" "strapi" {
+  name                 = "strapi-app"
+  image_tag_mutability = "MUTABLE"
+
+  image_scanning_configuration {
+    scan_on_push = false
+  }
+
+  tags = {
+    Name = "strapi-app-repository"
+  }
+}
+
+# -------------------------
 # EC2 Security Group
 # -------------------------
 resource "aws_security_group" "strapi_sg" {
