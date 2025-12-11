@@ -1,0 +1,99 @@
+name: CD - Deploy with Terraform
+
+on:
+  workflow_dispatch:
+    inputs:
+      docker_image:
+        description: 'Docker image to deploy (optional, uses latest if not specified)'
+        required: false
+        default: ''
+
+env:
+  AWS_REGION: ap-south-1
+  TERRAFORM_DIR: terraform
+
+jobs:
+  terraform-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: latest
+
+      - name: Terraform Init
+        working-directory: ${{ env.TERRAFORM_DIR }}
+        run: terraform init
+
+      - name: Terraform Plan
+        working-directory: ${{ env.TERRAFORM_DIR }}
+        run: terraform plan -no-color -out=tfplan
+        env:
+          TF_VAR_aws_region: ${{ env.AWS_REGION }}
+
+      - name: Terraform Apply
+        working-directory: ${{ env.TERRAFORM_DIR }}
+        run: terraform apply -no-color -auto-approve tfplan
+        env:
+          TF_VAR_aws_region: ${{ env.AWS_REGION }}
+
+      - name: Get Terraform Outputs
+        id: terraform_output
+        working-directory: ${{ env.TERRAFORM_DIR }}
+        run: |
+          PUBLIC_IP=$(terraform output -raw public_ip)
+          STRAPI_URL=$(terraform output -raw strapi_url)
+          echo "public_ip=$PUBLIC_IP" >> $GITHUB_OUTPUT
+          echo "strapi_url=$STRAPI_URL" >> $GITHUB_OUTPUT
+          echo "Deployment Info:" >> $GITHUB_STEP_SUMMARY
+          echo "- Public IP: $PUBLIC_IP" >> $GITHUB_STEP_SUMMARY
+          echo "- Strapi URL: $STRAPI_URL" >> $GITHUB_STEP_SUMMARY
+
+      - name: Verify EC2 Instance SSH
+        run: |
+          PUBLIC_IP="${{ steps.terraform_output.outputs.public_ip }}"
+          echo "Waiting for EC2 instance to be ready..."
+          sleep 30
+          # Try SSH connection (may take a minute for user_data to complete)
+          for i in {1..10}; do
+            if ssh-keyscan -H "$PUBLIC_IP" >> /tmp/known_hosts 2>/dev/null; then
+              echo "✓ SSH connectivity verified"
+              break
+            fi
+            echo "Attempt $i: Waiting for SSH to be available..."
+            sleep 10
+          done
+
+      - name: Log Deployment Success
+        run: |
+          echo "✓ Terraform deployment completed successfully"
+          echo "✓ EC2 Instance: ${{ steps.terraform_output.outputs.public_ip }}"
+          echo "✓ Strapi URL: ${{ steps.terraform_output.outputs.strapi_url }}"
+          echo "Note: Docker container startup takes ~2 minutes (includes RDS wait time)"
+
+      - name: Comment on workflow with deployment info
+        if: success()
+        run: |
+          echo "## Deployment Successful ✓" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Access Details" >> $GITHUB_STEP_SUMMARY
+          echo "- **SSH**: \`ssh -i terraform/id_rsa ubuntu@${{ steps.terraform_output.outputs.public_ip }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **URL**: ${{ steps.terraform_output.outputs.strapi_url }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Next Steps" >> $GITHUB_STEP_SUMMARY
+          echo "1. Wait 2-3 minutes for Docker container to fully start" >> $GITHUB_STEP_SUMMARY
+          echo "2. Access Strapi at: ${{ steps.terraform_output.outputs.strapi_url }}" >> $GITHUB_STEP_SUMMARY
+          echo "3. Check EC2 logs: \`ssh -i terraform/id_rsa ubuntu@${{ steps.terraform_output.outputs.public_ip }} 'docker logs strapi'\`" >> $GITHUB_STEP_SUMMARY
