@@ -34,6 +34,15 @@ jobs:
         working-directory: ${{ env.TERRAFORM_DIR }}
         run: terraform init
 
+      - name: Remove stale IAM resources from state
+        working-directory: ${{ env.TERRAFORM_DIR }}
+        continue-on-error: true
+        run: |
+          terraform state rm aws_iam_role.ec2_ecr_role 2>/dev/null || true
+          terraform state rm aws_iam_role_policy_attachment.ecr_policy 2>/dev/null || true
+          terraform state rm aws_iam_instance_profile.ec2_profile 2>/dev/null || true
+          echo "Cleaned stale IAM resources from Terraform state"
+
       - name: Terraform Plan
         working-directory: ${{ env.TERRAFORM_DIR }}
         run: terraform plan -no-color -out=tfplan
