@@ -2,15 +2,11 @@ name: CD - Deploy with Terraform
 
 on:
   workflow_dispatch:
-    inputs:
-      docker_image:
-        description: 'Docker image to deploy (optional, uses latest if not specified)'
-        required: false
-        default: ''
 
 env:
   AWS_REGION: ap-south-1
   TERRAFORM_DIR: terraform
+  ECR_REPOSITORY: strapi-app
 
 jobs:
   terraform-deploy:

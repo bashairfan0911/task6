@@ -14,7 +14,7 @@ variable "key_name" {
 }
  
 variable "docker_image" {
-  description = "Docker Hub image"
+  description = "ECR image URI for Strapi"
   type        = string
 }
  
